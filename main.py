@@ -345,6 +345,45 @@ def view_section_grades():
             print("No grades recorded yet.")
 
 
+def rank_students_by_section():
+    if not dict_grades:
+        print("No grades recorded yet.")
+        return
+
+    section = input("Enter section to rank (e.g., BSCS-12M1): ").upper()
+
+    student_list = []
+    for s_num, g_data in dict_grades.items():
+        if g_data['section'] == section:
+            student_list.append({
+                "student_number": s_num,
+                "name": g_data['name'],
+                "final_average": g_data['final_average'],
+                "remarks": g_data['remarks']
+            })
+
+    if not student_list:
+        print(f"No grade records found for section {section}.")
+        return
+
+    n = len(student_list)
+    for i in range(n - 1):
+        for j in range(0, n - i - 1):
+            if student_list[j]['final_average'] < student_list[j + 1]['final_average']:
+                student_list[j], student_list[j + 1] = student_list[j + 1], student_list[j]
+
+    print("\n" + "=" * 65)
+    print(f"CLASS RANKING - SECTION: {section}")
+    print("=" * 65)
+    print(f"{'RANK':<6} {'STUDENT NO.':<15} {'NAME':<25} {'AVERAGE':<10} {'REMARKS'}")
+    print("-" * 65)
+
+    for rank, student in enumerate(student_list, 1):
+        print(f"{rank:<6} {student['student_number']:<15} {student['name']:<25} "
+              f"{student['final_average']:<10.2f} {student['remarks']}")
+    print("-" * 65)
+
+
 def view_student_records_menu():
     while True:
         print("\n" + "=" * 50)
@@ -354,7 +393,8 @@ def view_student_records_menu():
         print("2. View students in a specific section")
         print("3. View specific student's grades")
         print("4. View grades of all students in a section")
-        print("5. Return to main menu")
+        print("5. Rank students by section")
+        print("6. Return to main menu")
 
         try:
             choice = int(input("\nEnter choice: "))
@@ -379,10 +419,14 @@ def view_student_records_menu():
             input("\nPress Enter to continue...")
 
         elif choice == 5:
+            rank_students_by_section()
+            input("\nPress Enter to continue...")
+
+        elif choice == 6:
             break
 
         else:
-            print("Invalid choice. Please select 1-5.")
+            print("Invalid choice. Please select 1-6.")
 
 
 def compute_quarter_grades():
