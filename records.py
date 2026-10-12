@@ -1,5 +1,6 @@
 import os
 import tablib
+import algorithms
 
 dict_student = {}
 dict_grades = {}
@@ -93,7 +94,17 @@ def load_from_files():
                 os.remove('grades.csv')
 
 
+def validate_student_number(student_num):
+    student_num = str(student_num).strip()
+    if not student_num.isdigit():
+        return False, "Student Number must contain digits only."
+    if len(student_num) != 6:
+        return False, "Student Number must be exactly 6 digits (e.g., 100001)."
+    return True, ""
+
+
 def validate_section(section):
+    section = str(section).strip().upper()
     if len(section) != 9 or section[4] != "-":
         return False
 
@@ -114,6 +125,9 @@ def validate_section(section):
 
 
 def validate_name_format(name):
+    if len(name) > 50:
+        return False, "Name cannot exceed 50 characters."
+
     if ',' not in name:
         return False, "Name must be in format: SURNAME, FIRSTNAME M.I."
 
@@ -143,3 +157,85 @@ def store_student(name, student_num, section):
     students_dataset.append([student_num, name.upper().strip(), section.upper().strip()])
     save_to_files()
     return dict_student[student_num]
+
+
+def validate_grade(val):
+    try:
+        val_str = str(val).strip()
+        score = float(val_str)
+        if 0.0 <= score <= 100.0:
+            return True, round(score, 2)
+        return False, "Grade must be between 0 and 100."
+    except (ValueError, TypeError):
+        return False, "Grade must be a valid number."
+
+
+def save_student_grades(student_num, subject_scores):
+    """
+    Save or update grades for a student across all subjects.
+    subject_scores format:
+    {
+        'PROGRAMMING': {'prelim': 85.0, 'midterm': 88.0, 'prefinal': 90.0, 'final': 92.0},
+        ...
+    }
+    """
+    global grades_dataset
+    student_num = str(student_num).strip()
+    if student_num not in dict_student:
+        return False, f"Student number '{student_num}' is not registered."
+
+    s_name = dict_student[student_num]["name"]
+    s_sec = dict_student[student_num]["section"]
+
+    if student_num not in dict_grades:
+        dict_grades[student_num] = {
+            'name': s_name,
+            'section': s_sec,
+            'final_average': 0.0,
+            'remarks': 'FAILED'
+        }
+    else:
+        dict_grades[student_num]['name'] = s_name
+        dict_grades[student_num]['section'] = s_sec
+
+    for subj in subjects:
+        if subj in subject_scores:
+            scores = subject_scores[subj]
+            dict_grades[student_num][subj] = {
+                'prelim': float(scores.get('prelim', 0.0)),
+                'midterm': float(scores.get('midterm', 0.0)),
+                'prefinal': float(scores.get('prefinal', 0.0)),
+                'final': float(scores.get('final', 0.0))
+            }
+
+    final_avg = algorithms.calculate_final_average(dict_grades[student_num], subjects)
+    dict_grades[student_num]['final_average'] = round(final_avg, 2)
+    dict_grades[student_num]['remarks'] = "PASSED" if final_avg >= 75 else "FAILED"
+
+    # Rebuild grades_dataset to keep everything consistent
+    new_dataset = tablib.Dataset()
+    new_dataset.headers = ['Student Number', 'Name', 'Section', 'Subject', 'PRELIM', 'MIDTERM',
+                           'PREFINAL', 'FINAL', 'SUBJECT_FINAL_GRADE', 'REMARKS', 'FINAL_AVERAGE']
+
+    for s_id, s_info in dict_grades.items():
+        name = s_info.get('name', '')
+        section = s_info.get('section', '')
+        avg = s_info.get('final_average', 0.0)
+        for subj in subjects:
+            if subj in s_info and isinstance(s_info[subj], dict):
+                q = s_info[subj]
+                p = q.get('prelim', 0.0)
+                m = q.get('midterm', 0.0)
+                pf = q.get('prefinal', 0.0)
+                f = q.get('final', 0.0)
+                subj_final = round(algorithms.calculate_final_subject_grade(s_info, subj), 2)
+                subj_remarks = "PASSED" if subj_final >= 75 else "FAILED"
+                new_dataset.append([
+                    s_id, name, section, subj,
+                    p, m, pf, f,
+                    subj_final, subj_remarks, avg
+                ])
+
+    grades_dataset = new_dataset
+    save_to_files()
+    return True, "Grades successfully saved!"
